@@ -1,0 +1,7 @@
+requests==2.31.0
+pymongo==4.3.3
+sanic==23.3.0
+google-cloud-storage==2.9.0
+dlib==19.24.2
+scikit-image==0.21.0
+numpy==1.25.0

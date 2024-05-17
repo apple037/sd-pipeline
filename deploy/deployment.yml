@@ -1,0 +1,29 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auto-generator
+spec:
+  replicas: 1  # 副本数量
+  selector:
+    matchLabels:
+      app: auto-generator
+  template:
+    metadata:
+      labels:
+        app: auto-generator
+    spec:
+      containers:
+        - name: auto-generator
+          image: auto-generator:latest  # 替换为你的应用程序的Docker镜像名称和标签
+          ports:
+            - containerPort: 9008  # 应用程序的容器端口
+          livenessProbe:
+            httpGet:
+              path: /hb
+              port: port
+            initialDelaySeconds: 30
+            periodSeconds: 40
+            timeoutSeconds: 30
+            successThreshold: 1
+            failureThreshold: 5
