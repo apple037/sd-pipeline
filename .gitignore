@@ -3,3 +3,4 @@ resources
 outputs
 venv
 .idea
+.idea/*

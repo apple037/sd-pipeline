@@ -1,0 +1,58 @@
+# .gitlab-ci.yml
+image: docker:20.10.16
+
+stages:
+  - build-image-dev
+  - deploy-dev
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  KUBECONFIG: /etc/deploy/config
+  IMAGE_NAME: gcr.io/$GCP_PROJECT/auto-generator
+  IMAGE_TAG: $CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+  CONTAINER_NAME: auto-generator
+
+build-image-dev:
+  stage: build-image-dev
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - until docker info; do sleep 1; done
+  tags:
+    - backend-runner
+  environment: Develop
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "feature-ci"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+  script:
+    - ls
+    - echo $SERVICE_ACCOUNT_KEYFILE > gcr-key.json
+    - docker login -u _json_key --password-stdin https://gcr.io < gcr-key.json
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -f deploy/Dockerfile .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+
+deploy-dev:
+  stage: deploy-dev
+  image: google/cloud-sdk:latest
+  tags:
+    - backend-runner
+  environment: Develop
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "feature-ci"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+  script:
+    - echo $SERVICE_ACCOUNT_KEYFILE > /tmp/keyfile.json
+    - gcloud auth activate-service-account --key-file=/tmp/keyfile.json
+    - gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $GCP_PROJECT
+    - kubectl apply -f deploy/deployment.yml -n default
+    - kubectl apply -f deploy/service.yml -n default
+    - kubectl set image deployment/$CONTAINER_NAME $CONTAINER_NAME=$IMAGE_NAME:$IMAGE_TAG -n default
+    # - kubectl rollout restart deployment/next-app
